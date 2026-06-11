@@ -1,0 +1,16 @@
+{
+  "name": "backend-voluntariados",
+  "version": "1.0.0",
+  "description": "Backend para la aplicación de voluntariados conectada a Neon Tech",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  },
+  "author": "",
+  "license": "ISC"
+}
