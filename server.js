@@ -39,7 +39,45 @@ app.get('/api/eventos', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener los eventos de la base de datos' });
   }
 });
+// Ruta de Login en server.js
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
 
+    try {
+        // Buscamos el usuario por su email en Neon Tech
+        // ⚠️ Revisa si tu columna se llama 'email' y 'password' (o 'contrasena')
+        const result = await pool.query(
+            'SELECT usuario_id, username, email, tipo_usuario, password FROM usuarios WHERE email = $1', 
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "El usuario no existe" });
+        }
+
+        const usuario = result.rows[0];
+
+        // Verificación de contraseña (texto plano para tu prueba actual)
+        if (usuario.password !== password) {
+            return res.status(401).json({ message: "Contraseña incorrecta" });
+        }
+
+        // Si todo está bien, respondemos sus datos y su ROL (tipo_usuario)
+        res.json({
+            message: "Login exitoso",
+            usuario: {
+                usuario_id: usuario.usuario_id,
+                username: usuario.username,
+                email: usuario.email,
+                tipo_usuario: usuario.tipo_usuario // Aquí va el 1, 2 o 3
+            }
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Error en el servidor al intentar loguear" });
+    }
+});
 // =======================================================================
 // 📝 RUTA 2 [POST]: CREAR EVENTO (Para guardar un nuevo pin desde la App)
 // =======================================================================
@@ -72,7 +110,31 @@ app.post('/api/eventos', async (req, res) => {
     res.status(500).json({ error: 'No se pudo registrar el evento en la base de datos' });
   }
 });
+// Ruta para registrar nuevos usuarios en server.js
+app.post('/api/registro', async (req, res) => {
+    const { username, email, password } = req.body;
 
+    try {
+        // 1. Validamos que el correo no esté registrado previamente
+        const validarEmail = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+        if (validarEmail.rows.length > 0) {
+            return res.status(400).json({ message: "El correo electrónico ya está en uso" });
+        }
+
+        // 2. Insertamos el nuevo registro
+        // 🚨 IMPORTANTE: Definimos tipo_usuario = 1 por defecto (Usuario normal sin permisos de subida)
+        await pool.query(
+            'INSERT INTO usuarios (username, email, password, tipo_usuario) VALUES ($1, $2, $3, 1)',
+            [username, email, password]
+        );
+
+        res.json({ message: "¡Cuenta creada con éxito! Ya puedes iniciar sesión." });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Error interno del servidor al crear la cuenta" });
+    }
+});
 // =======================================================================
 // 🚀 CONFIGURACIÓN DEL PUERTO (Dinámico para Render / 10000 para Local)
 // =======================================================================
