@@ -1,7 +1,7 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
-const bcrypt = require('bcrypt'); // ✅ AGREGA ESTO
+const bcrypt = require('bcryptjs'); // ✅ usa bcryptjs
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,19 +9,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://usuario:password@identificador-neon.aws.neon.tech/neondb?sslmode=require';
-const pool = new Pool({ connectionString });
-
-pool.query('SELECT NOW()', (err, res) => {
-    if (err) console.error('❌ Error con Neon Tech:', err.message);
-    else console.log('🚀 Conectado a Neon Tech:', res.rows[0].now);
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
 });
 
-// ==========================================================
-// CASO 1: REGISTRO CON BCRYPT ✅
-// ==========================================================
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) console.error('❌ Error con Neon:', err.message);
+    else console.log('🚀 Conectado a Neon:', res.rows[0].now);
+});
+
+// CASO 1: REGISTRO
 app.post('/api/registro', async (req, res) => {
-    const { nombre, email, password, rut } = req.body;
+    // ✅ Recibimos num_documento también según la documentación
+    const { nombre, email, password, rut, num_documento } = req.body;
 
     if (!nombre || !email || !password || !rut) {
         return res.status(400).json({ message: "Todos los campos son obligatorios" });
@@ -35,27 +36,28 @@ app.post('/api/registro', async (req, res) => {
             return res.status(400).json({ message: "El correo ya está registrado" });
         }
 
-        // ✅ Hasheamos la contraseña antes de guardarla
-        const saltRounds = 10;
-        const passwordHasheada = await bcrypt.hash(password, saltRounds);
+        const passwordHasheada = await bcrypt.hash(password, 10);
 
         await pool.query(
             `INSERT INTO usuarios (
                 nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
-            ) VALUES ($1, $2, $3, decode($4, 'escape'), NULL, 1)`,
-            [nombre, email, passwordHasheada, rut]
+            ) VALUES (
+                $1, $2, $3,
+                convert_to($4, 'UTF8'),
+                CASE WHEN $5 IS NOT NULL THEN convert_to($5, 'UTF8') ELSE NULL END,
+                1
+            )`,
+            [nombre, email, passwordHasheada, rut, num_documento || null]
         );
 
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
     } catch (err) {
         console.error('❌ Error en /api/registro:', err.message);
-        res.status(500).json({ error: "Error en el servidor al procesar el registro" });
+        res.status(500).json({ error: err.message }); // ✅ Muestra el error real
     }
 });
 
-// ==========================================================
-// CASO 2: LOGIN CON BCRYPT ✅
-// ==========================================================
+// CASO 2: LOGIN
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -64,7 +66,6 @@ app.post('/api/login', async (req, res) => {
     }
 
     try {
-        // ✅ Buscamos solo por email, luego comparamos el hash
         const usuarioQuery = await pool.query(
             'SELECT usuario_id, nombre, email, tipo_usuario, password_hash FROM usuarios WHERE email = $1',
             [email]
@@ -75,9 +76,8 @@ app.post('/api/login', async (req, res) => {
         }
 
         const usuario = usuarioQuery.rows[0];
-
-        // ✅ Comparamos la contraseña ingresada con el hash guardado
         const passwordValida = await bcrypt.compare(password, usuario.password_hash);
+
         if (!passwordValida) {
             return res.status(401).json({ message: "Credenciales incorrectas" });
         }
@@ -93,24 +93,22 @@ app.post('/api/login', async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Error en /api/login:', err.message);
-        res.status(500).json({ error: "Error interno del servidor" });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// ==========================================================
-// UPGRADE A ORGANIZADOR (sin cambios)
-// ==========================================================
+// UPGRADE A ORGANIZADOR
 app.post('/api/upgrade', async (req, res) => {
     const { id, num_documento } = req.body;
 
     if (!id || !num_documento) {
-        return res.status(400).json({ message: "Datos insuficientes para el ascenso" });
+        return res.status(400).json({ message: "Datos insuficientes" });
     }
 
     try {
         const resultado = await pool.query(
             `UPDATE usuarios 
-             SET num_documento_encriptado = decode($1, 'escape'), tipo_usuario = 2 
+             SET num_documento_encriptado = convert_to($1, 'UTF8'), tipo_usuario = 2 
              WHERE usuario_id = $2 RETURNING *`,
             [num_documento, id]
         );
@@ -122,13 +120,11 @@ app.post('/api/upgrade', async (req, res) => {
         res.json({ message: "¡Validación aprobada! Ahora eres Organizador." });
     } catch (err) {
         console.error('❌ Error en /api/upgrade:', err.message);
-        res.status(500).json({ error: "Error al validar el documento" });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// ==========================================================
-// CASO 3: CREAR EVENTO (sin cambios)
-// ==========================================================
+// CASO 3: CREAR EVENTO
 app.post('/api/eventos', async (req, res) => {
     const { titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por } = req.body;
 
@@ -144,21 +140,19 @@ app.post('/api/eventos', async (req, res) => {
         );
         res.json({ message: "¡Punto de voluntariado publicado con éxito!" });
     } catch (err) {
-        console.error('❌ Error en /api/eventos (POST):', err.message);
-        res.status(500).json({ error: "Error al registrar el punto" });
+        console.error('❌ Error en /api/eventos POST:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// ==========================================================
-// LEER EVENTOS (sin cambios)
-// ==========================================================
+// LEER EVENTOS
 app.get('/api/eventos', async (req, res) => {
     try {
         const queryEventos = await pool.query('SELECT * FROM eventos');
         res.json(queryEventos.rows);
     } catch (err) {
-        console.error('❌ Error en /api/eventos (GET):', err.message);
-        res.status(500).json({ error: "Error al leer puntos" });
+        console.error('❌ Error en /api/eventos GET:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
