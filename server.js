@@ -136,7 +136,7 @@ app.post('/api/eventos', async (req, res) => {
 
     try {
         await pool.query(
-            `INSERT INTO eventos (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por)
+            `INSERT INTO voluntariados (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por]
         );
