@@ -1,67 +1,49 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const bcrypt = require('bcrypt'); // ✅ AGREGA ESTO
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==========================================================
-// ⚙️ MIDDLEWARES DE INFRAESTRUCTURA
-// ==========================================================
-app.use(cors()); // Permite conexiones desde el emulador o teléfonos reales
-app.use(express.json()); // 🚨 CRÍTICO: Permite que Node.js lea los cuerpos JSON enviados desde Android
+app.use(cors());
+app.use(express.json());
 
-// ==========================================================
-// 🗄️ ENLACE DIRECTO A NEON TECH (PostgreSQL)
-// ==========================================================
-// ⚠️ REVISA: Reemplaza esta URL con la cadena de conexión real de tu panel de Neon
 const connectionString = process.env.DATABASE_URL || 'postgresql://usuario:password@identificador-neon.aws.neon.tech/neondb?sslmode=require';
+const pool = new Pool({ connectionString });
 
-const pool = new Pool({
-    connectionString: connectionString,
-});
-
-// Comprobar estado de salud de la base de datos al encender el servidor
 pool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-        console.error('❌ Error crítico al conectar con Neon Tech:', err.message);
-    } else {
-        console.log('🚀 Conexión establecida de forma exitosa con Neon Tech:', res.rows[0].now);
-    }
+    if (err) console.error('❌ Error con Neon Tech:', err.message);
+    else console.log('🚀 Conectado a Neon Tech:', res.rows[0].now);
 });
 
 // ==========================================================
-// 📝 CASO 1: ENDPOINT DE REGISTRO SIMPLIFICADO
+// CASO 1: REGISTRO CON BCRYPT ✅
 // ==========================================================
 app.post('/api/registro', async (req, res) => {
-    const { nombre, email, password, rut } = req.body; 
+    const { nombre, email, password, rut } = req.body;
 
     if (!nombre || !email || !password || !rut) {
         return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
 
     try {
-        // Verificar disponibilidad de correo
-        const validarEmail = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+        const validarEmail = await pool.query(
+            'SELECT * FROM usuarios WHERE email = $1', [email]
+        );
         if (validarEmail.rows.length > 0) {
-            return res.status(400).json({ message: "El correo electrónico ya está registrado" });
+            return res.status(400).json({ message: "El correo ya está registrado" });
         }
 
-        // Mapeo adaptado a tu esquema:
-        // - 'usuario_id' se autogenera mediante DEFAULT gen_random_uuid().
-        // - 'rut' se escapa para que sea compatible con la columna BYTEA (rut_encriptado).
-        // - 'num_documento_encriptado' entra vacío (NULL) hasta que soliciten el upgrade.
-        // - 'tipo_usuario' es 1 por defecto (Voluntario).
+        // ✅ Hasheamos la contraseña antes de guardarla
+        const saltRounds = 10;
+        const passwordHasheada = await bcrypt.hash(password, saltRounds);
+
         await pool.query(
             `INSERT INTO usuarios (
-                nombre, 
-                email, 
-                password_hash, 
-                rut_encriptado, 
-                num_documento_encriptado, 
-                tipo_usuario
+                nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
             ) VALUES ($1, $2, $3, decode($4, 'escape'), NULL, 1)`,
-            [nombre, email, password, rut]
+            [nombre, email, passwordHasheada, rut]
         );
 
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
@@ -72,7 +54,7 @@ app.post('/api/registro', async (req, res) => {
 });
 
 // ==========================================================
-// 🔑 CASO 2: ENDPOINT DE LOGIN
+// CASO 2: LOGIN CON BCRYPT ✅
 // ==========================================================
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -82,10 +64,10 @@ app.post('/api/login', async (req, res) => {
     }
 
     try {
-        // Comparamos el login usando la columna 'password_hash' de tu imagen
+        // ✅ Buscamos solo por email, luego comparamos el hash
         const usuarioQuery = await pool.query(
-            'SELECT usuario_id, nombre, email, tipo_usuario FROM usuarios WHERE email = $1 AND password_hash = $2', 
-            [email, password]
+            'SELECT usuario_id, nombre, email, tipo_usuario, password_hash FROM usuarios WHERE email = $1',
+            [email]
         );
 
         if (usuarioQuery.rows.length === 0) {
@@ -94,34 +76,38 @@ app.post('/api/login', async (req, res) => {
 
         const usuario = usuarioQuery.rows[0];
 
-        // Respondemos con la estructura exacta que tu App Android (UsuarioData) necesita leer
+        // ✅ Comparamos la contraseña ingresada con el hash guardado
+        const passwordValida = await bcrypt.compare(password, usuario.password_hash);
+        if (!passwordValida) {
+            return res.status(401).json({ message: "Credenciales incorrectas" });
+        }
+
         res.json({
             message: "Ingreso exitoso",
             usuario: {
-                id: usuario.usuario_id, // Convertimos tu 'usuario_id' al parámetro 'id' de Android
+                id: usuario.usuario_id,
                 nombre: usuario.nombre,
                 email: usuario.email,
-                tipo_usuario: usuario.tipo_usuario || 1 // Resguardo si viene nulo
+                tipo_usuario: usuario.tipo_usuario || 1
             }
         });
     } catch (err) {
         console.error('❌ Error en /api/login:', err.message);
-        res.status(500).json({ error: "Error interno del servidor en el login" });
+        res.status(500).json({ error: "Error interno del servidor" });
     }
 });
 
 // ==========================================================
-// 🚀 ENDPOINT DE ASCENSO POSTERIOR (Upgrade a Organizador)
+// UPGRADE A ORGANIZADOR (sin cambios)
 // ==========================================================
 app.post('/api/upgrade', async (req, res) => {
-    const { id, num_documento } = req.body; // Recibe el id (usuario_id) y el documento de identidad
+    const { id, num_documento } = req.body;
 
     if (!id || !num_documento) {
         return res.status(400).json({ message: "Datos insuficientes para el ascenso" });
     }
 
     try {
-        // Guardamos el documento como escape binario en 'num_documento_encriptado' y cambiamos tipo_usuario a 2
         const resultado = await pool.query(
             `UPDATE usuarios 
              SET num_documento_encriptado = decode($1, 'escape'), tipo_usuario = 2 
@@ -130,56 +116,52 @@ app.post('/api/upgrade', async (req, res) => {
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ message: "El usuario no existe en el sistema" });
+            return res.status(404).json({ message: "Usuario no encontrado" });
         }
 
-        res.json({ message: "¡Validación aprobada! Ahora eres Organizador de eventos." });
+        res.json({ message: "¡Validación aprobada! Ahora eres Organizador." });
     } catch (err) {
         console.error('❌ Error en /api/upgrade:', err.message);
-        res.status(500).json({ error: "Error de servidor al validar el número de documento" });
+        res.status(500).json({ error: "Error al validar el documento" });
     }
 });
 
 // ==========================================================
-// 🗺️ CASO 3: ENDPOINT PARA CREAR PUNTO DE VOLUNTARIADO
+// CASO 3: CREAR EVENTO (sin cambios)
 // ==========================================================
 app.post('/api/eventos', async (req, res) => {
     const { titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por } = req.body;
 
+    if (!titulo || !descripcion || !latitud || !longitud || !creado_por) {
+        return res.status(400).json({ message: "Faltan campos obligatorios" });
+    }
+
     try {
-        // Registra el pin guardando el UUID del organizador (creado_por) apuntando a 'usuario_id'
         await pool.query(
-            `INSERT INTO eventos (
-                titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            `INSERT INTO eventos (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por]
         );
-
-        res.json({ message: "¡Punto de voluntariado publicado con éxito en el mapa!" });
+        res.json({ message: "¡Punto de voluntariado publicado con éxito!" });
     } catch (err) {
         console.error('❌ Error en /api/eventos (POST):', err.message);
-        res.status(500).json({ error: "Error al registrar el punto en el mapa" });
+        res.status(500).json({ error: "Error al registrar el punto" });
     }
 });
 
 // ==========================================================
-// 📡 ENDPOINT EXTRA: LEER EVENTOS (Para pintar el mapa de Android)
+// LEER EVENTOS (sin cambios)
 // ==========================================================
 app.get('/api/eventos', async (req, res) => {
     try {
         const queryEventos = await pool.query('SELECT * FROM eventos');
-        res.json(queryEventos.rows); // Envía la lista de pines a la aplicación
+        res.json(queryEventos.rows);
     } catch (err) {
         console.error('❌ Error en /api/eventos (GET):', err.message);
-        res.status(500).json({ error: "Error al leer puntos desde Neon Tech" });
+        res.status(500).json({ error: "Error al leer puntos" });
     }
 });
 
-// ==========================================================
-// 🏁 INICIO DEL SERVIDOR
-// ==========================================================
 app.listen(PORT, () => {
-    console.log(`\n=================================================`);
-    console.log(`📡 Backend corriendo y listo en: http://localhost:${PORT}`);
-    console.log(`=================================================\n`);
+    console.log(`📡 Backend corriendo en: http://localhost:${PORT}`);
 });
