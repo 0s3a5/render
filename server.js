@@ -1,143 +1,171 @@
 const express = require('express');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// --- MIDDLEWARES ---
-// Permitir que tu app de Android (u otras fuentes) se conecte sin bloqueos de CORS
-app.use(cors());
-// Habilitar al servidor para recibir y procesar datos en formato JSON
-app.use(express.json()); 
+// ==========================================================
+// ⚙️ MIDDLEWARES INFRAESTRUCTURA
+// ==========================================================
+app.use(cors()); // Permite conexiones desde el emulador o celulares reales
+app.use(express.json()); // 🚨 CRÍTICO: Permite que Node.js lea los archivos JSON enviados desde Android
 
-// --- CONFIGURACIÓN DE NEON TECH (POSTGRESQL) ---
+// ==========================================================
+// 🗄️ CONFIGURACIÓN DE ENLACE A NEON TECH (PostgreSQL)
+// ==========================================================
+// Reemplaza los datos dentro de la URL con tus credenciales reales de Neon Tech
+const connectionString = process.env.DATABASE_URL || 'postgresql://usuario:password@identificador-neon.aws.neon.tech/neondb?sslmode=require';
+
 const pool = new Pool({
-  connectionString: "postgresql://neondb_owner:npg_UvGCiLH8fBZ9@ep-restless-wildflower-aqs0lfl4-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require",
+    connectionString: connectionString,
 });
 
-// Probamos la conexión inicial con Neon al encender el backend
-pool.connect((err, client, release) => {
-  if (err) {
-    return console.error('❌ Error de conexión con Neon Tech:', err.stack);
-  }
-  console.log('🔌 Conexión exitosa y segura establecida con Neon Tech');
-  release();
+// Verificar conexión inicial con Neon Tech
+pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+        console.error('❌ Error crítico al conectar con Neon Tech:', err.message);
+    } else {
+        console.log('🚀 Conexión exitosa a la Base de Datos Neon Tech:', res.rows[0].now);
+    }
 });
 
-// =======================================================================
-// 📍 RUTA 1 [GET]: OBTENER EVENTOS (Para pintar los pines en tu Mapa de Android)
-// =======================================================================
-app.get('/api/eventos', async (req, res) => {
-  try {
-    // Consulta limpia a la tabla de voluntariados
-    const result = await pool.query('SELECT * FROM voluntariados;');
-    
-    // El backend le responde a Android enviándole la lista en un JSON limpio
-    res.json(result.rows); 
-  } catch (err) {
-    console.error("Error en el GET de Neon:", err.message);
-    res.status(500).json({ error: 'Error al obtener los eventos de la base de datos' });
-  }
-});
-// Ruta de Login en server.js
-
-// =======================================================================
-// 📝 RUTA 2 [POST]: CREAR EVENTO (Para guardar un nuevo pin desde la App)
-// =======================================================================
-app.post('/api/eventos', async (req, res) => {
-  // Desestructuramos los campos exactos que enviará tu app de Android en formato JSON
-  const { titulo, descripcion, tipo_evento, direccion, latitud, longitud, creado_por } = req.body;
-
-  // Validación básica por seguridad
-  if (!titulo || !latitud || !longitud) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios (titulo, latitud o longitud)' });
-  }
-
-  try {
-    // Inserción parametrizada estándar para evitar inyecciones SQL nocivas
-    const query = `
-      INSERT INTO voluntariados (titulo, descripcion, tipo_evento, direccion, latitud, longitud, creado_por) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
-    `;
-    const values = [titulo, descripcion, tipo_evento, direccion, latitud, longitud, creado_por];
-    
-    const result = await pool.query(query, values);
-    
-    // Respondemos a Android que se guardó correctamente y le devolvemos el objeto creado
-    res.status(201).json({ 
-      message: '¡Evento de voluntariado registrado con éxito!', 
-      evento: result.rows[0] 
-    });
-  } catch (err) {
-    console.error("Error en el POST de Neon:", err.message);
-    res.status(500).json({ error: 'No se pudo registrar el evento en la base de datos' });
-  }
-});
-// Ruta para registrar nuevos usuarios en server.js
-// Necesitamos usar crypto para generar los UUIDs si tu tabla no lo hace por defecto
-const crypto = require('crypto');
-
-// ===== CASO 1: ENDPOINT DE REGISTRO =====
+// ==========================================================
+// 📝 CASO 1: ENDPOINT DE REGISTRO (Simplificado, sin documento)
+// ==========================================================
 app.post('/api/registro', async (req, res) => {
-    // Recibe exactamente tu formato Caso 1
-    const { nombre, email, password, rut, num_documento } = req.body;
+    const { nombre, email, password, rut } = req.body;
+
+    // Validación simple en servidor
+    if (!nombre || !email || !password || !rut) {
+        return res.status(400).json({ message: "Todos los campos son obligatorios" });
+    }
 
     try {
+        // Verificar si el correo ya existe
         const validarEmail = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
         if (validarEmail.rows.length > 0) {
             return res.status(400).json({ message: "El correo electrónico ya está registrado" });
         }
 
-        // Generamos un nuevo UUID v4 para el usuario
+        // Generamos un UUID único universal v4 para el nuevo usuario
         const nuevoId = crypto.randomUUID();
 
-        // Guardamos en la base de datos Neon Tech
-        // tipo_usuario = 1 (Voluntario por defecto)
+        // Guardamos en Neon Tech: num_documento entra como NULL, tipo_usuario = 1 (Voluntario)
         await pool.query(
-            'INSERT INTO usuarios (id, nombre, email, password, rut, num_documento, tipo_usuario) VALUES ($1, $2, $3, $4, $5, $6, 1)',
-            [nuevoId, nombre, email, password, rut, num_documento]
+            'INSERT INTO usuarios (id, nombre, email, password, rut, num_documento, tipo_usuario) VALUES ($1, $2, $3, $4, $5, NULL, 1)',
+            [nuevoId, nombre, email, password, rut]
         );
 
-        res.json({ message: "¡Cuenta creada con éxito! Ya puedes ingresar." });
+        res.json({ message: "¡Cuenta creada con éxito! Entraste como Voluntario." });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Error en el servidor al registrar" });
+        console.error('❌ Error en /api/registro:', err.message);
+        res.status(500).json({ error: "Error en el servidor al procesar el registro" });
     }
 });
 
-// ===== CASO 2: ENDPOINT DE LOGIN =====
+// ==========================================================
+// 🔑 CASO 2: ENDPOINT DE LOGIN (Retorna el UUID y el rol activo)
+// ==========================================================
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: "Correo y contraseña requeridos" });
+    }
 
     try {
         const usuarioQuery = await pool.query('SELECT * FROM usuarios WHERE email = $1 AND password = $2', [email, password]);
 
         if (usuarioQuery.rows.length === 0) {
-            return res.status(401).json({ message: "Credenciales inválidas" });
+            return res.status(401).json({ message: "Credenciales incorrectas" });
         }
 
         const usuario = usuarioQuery.rows[0];
 
-        // Respondemos mandándole el ID (UUID) a la app para que lo guarde en memoria
+        // Respondemos mandándole el objeto idéntico al 'UsuarioData' de Android
         res.json({
             message: "Ingreso exitoso",
             usuario: {
-                id: usuario.id, // Enviar el UUID guardado en Neon Tech
+                id: usuario.id,               // UUID guardado en base
                 nombre: usuario.nombre,
                 email: usuario.email,
-                tipo_usuario: usuario.tipo_usuario
+                tipo_usuario: usuario.tipo_usuario // 1: Voluntario, 2: Organizador
             }
         });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Error interno en el login" });
+        console.error('❌ Error en /api/login:', err.message);
+        res.status(500).json({ error: "Error interno del servidor en el login" });
     }
 });
-// =======================================================================
-// 🚀 CONFIGURACIÓN DEL PUERTO (Dinámico para Render / 10000 para Local)
-// =======================================================================
-const PORT = process.env.PORT || 10000; 
 
+// ==========================================================
+// 🚀 NUEVO ENDPOINT: ASCENSO A ORGANIZADOR (Upgrade posterior)
+// ==========================================================
+app.post('/api/upgrade', async (req, res) => {
+    const { id, num_documento } = req.body; // Recibe el UUID del usuario y el número de documento
+
+    if (!id || !num_documento) {
+        return res.status(400).json({ message: "Datos insuficientes para el ascenso" });
+    }
+
+    try {
+        // Buscamos al usuario por su UUID, inyectamos su documento y subimos su rol a 2
+        const resultado = await pool.query(
+            'UPDATE usuarios SET num_documento = $1, tipo_usuario = 2 WHERE id = $2 RETURNING *',
+            [num_documento, id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ message: "El usuario no existe en el sistema" });
+        }
+
+        res.json({ message: "¡Validación aprobada! Ahora eres Organizador de eventos." });
+    } catch (err) {
+        console.error('❌ Error en /api/upgrade:', err.message);
+        res.status(500).json({ error: "Error de servidor al validar el número de documento" });
+    }
+});
+
+// ==========================================================
+// 🗺️ CASO 3: ENDPOINT PARA CREAR PUNTO DE VOLUNTARIADO
+// ==========================================================
+app.post('/api/eventos', async (req, res) => {
+    const { titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por } = req.body;
+
+    try {
+        // Insertamos el punto vinculándolo dinámicamente con el UUID de quien inició sesión (creado_por)
+        await pool.query(
+            'INSERT INTO eventos (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+            [titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por]
+        );
+
+        res.json({ message: "¡Punto de voluntariado publicado con éxito en el mapa!" });
+    } catch (err) {
+        console.error('❌ Error en /api/eventos (POST):', err.message);
+        res.status(500).json({ error: "Error al registrar el punto en el mapa" });
+    }
+});
+
+// ==========================================================
+// 📡 ENDPOINT EXTRA: OBTENER TODOS LOS EVENTOS (Para pintar el mapa)
+// ==========================================================
+app.get('/api/eventos', async (req, res) => {
+    try {
+        const queryEventos = await pool.query('SELECT * FROM eventos');
+        res.json(queryEventos.rows); // Retorna el arreglo de pines a Android
+    } catch (err) {
+        console.error('❌ Error en /api/eventos (GET):', err.message);
+        res.status(500).json({ error: "Error al leer puntos desde Neon Tech" });
+    }
+});
+
+// ==========================================================
+// 🏁 INICIO DEL SERVIDOR
+// ==========================================================
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend corriendo con éxito en el puerto ${PORT}`);
+    console.log(`\n==============================================`);
+    console.log(`📡 Servidor ejecutándose en: http://localhost:${PORT}`);
+    console.log(`==============================================\n`);
 });
