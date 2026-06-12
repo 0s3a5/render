@@ -38,16 +38,18 @@ app.post('/api/registro', async (req, res) => {
 
         const passwordHasheada = await bcrypt.hash(password, 10);
 
-        await pool.query(
+        const numDocBytea = num_documento ? num_documento : '';
+
+await pool.query(
     `INSERT INTO usuarios (
         nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
     ) VALUES (
         $1, $2, $3,
         convert_to($4, 'UTF8'),
-        CASE WHEN $5::text IS NOT NULL THEN convert_to($5::text, 'UTF8') ELSE NULL END,
+        convert_to($5, 'UTF8'),
         1
     )`,
-    [nombre, email, passwordHasheada, rut, num_documento || null]
+    [nombre, email, passwordHasheada, rut, numDocBytea]
 );
 El fix es agregar ::text para que PostgreSQL sepa exactamente qué tipo esperar aunque llegue NULL.
 
