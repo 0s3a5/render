@@ -39,16 +39,22 @@ app.post('/api/registro', async (req, res) => {
         const passwordHasheada = await bcrypt.hash(password, 10);
 
         await pool.query(
-            `INSERT INTO usuarios (
-                nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
-            ) VALUES (
-                $1, $2, $3,
-                convert_to($4, 'UTF8'),
-                CASE WHEN $5 IS NOT NULL THEN convert_to($5, 'UTF8') ELSE NULL END,
-                1
-            )`,
-            [nombre, email, passwordHasheada, rut, num_documento || null]
-        );
+    `INSERT INTO usuarios (
+        nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
+    ) VALUES (
+        $1, $2, $3,
+        convert_to($4, 'UTF8'),
+        CASE WHEN $5::text IS NOT NULL THEN convert_to($5::text, 'UTF8') ELSE NULL END,
+        1
+    )`,
+    [nombre, email, passwordHasheada, rut, num_documento || null]
+);
+El fix es agregar ::text para que PostgreSQL sepa exactamente qué tipo esperar aunque llegue NULL.
+
+Haz git push y prueba de nuevo.
+
+
+Cla
 
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
     } catch (err) {
