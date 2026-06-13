@@ -41,17 +41,17 @@ app.post('/api/registro', async (req, res) => {
         const numDocBytea = num_documento ? num_documento : '';
 
 await pool.query(
-            `INSERT INTO usuarios (
-                nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
-            ) VALUES ($1, $2, $3, $4, $5, 1)`,
-            [
-                nombre,
-                email,
-                passwordHasheada,
-                Buffer.from(rut),
-                Buffer.from(num_documento || '0')
-            ]
-        );
+    `INSERT INTO usuarios (
+        nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
+    ) VALUES ($1, $2, $3, $4::bytea, $5::bytea, 1)`,
+    [
+        nombre,
+        email,
+        passwordHasheada,
+        Buffer.from(rut), // Ojo: Esto sigue sin ser AES-256
+        num_documento ? Buffer.from(num_documento) : null 
+    ]
+);
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
     } catch (err) {
         console.error('❌ Error en /api/registro:', err.message);
