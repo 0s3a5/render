@@ -105,7 +105,7 @@ app.post('/api/upgrade', async (req, res) => {
         const resultado = await pool.query(
             `UPDATE usuarios 
              SET tipo_usuario = 2,           -- 🪪 Cambia a Organizador
-                 verificado = true,          --  Fuerza el estado de verificación
+                 verificacion = true,          --  Fuerza el estado de verificación
                  num_documento_encriptado = convert_to($1, 'UTF8') 
              WHERE usuario_id = $2 
              RETURNING *`,
