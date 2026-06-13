@@ -168,7 +168,7 @@ app.get('/api/eventos', async (req, res) => {
                 e.fecha_evento,
                 e.creado_por,
                 u.nombre AS nombre_creador
-            FROM eventos e /* O 'voluntariados v' si cambiaste el nombre de la tabla */
+            FROM voluntariados v 
             INNER JOIN usuarios u ON e.creado_por = u.usuario_id
         `);
         
