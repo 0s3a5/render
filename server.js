@@ -21,7 +21,6 @@ pool.query('SELECT NOW()', (err, res) => {
 
 // CASO 1: REGISTRO
 app.post('/api/registro', async (req, res) => {
-    // ✅ Recibimos num_documento también según la documentación
     const { nombre, email, password, rut, num_documento } = req.body;
 
     if (!nombre || !email || !password || !rut) {
@@ -38,24 +37,22 @@ app.post('/api/registro', async (req, res) => {
 
         const passwordHasheada = await bcrypt.hash(password, 10);
 
-        const numDocBytea = num_documento ? num_documento : '';
-
-await pool.query(
-    `INSERT INTO usuarios (
-        nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
-    ) VALUES ($1, $2, $3, $4::bytea, $5::bytea, 1)`,
-    [
-        nombre,
-        email,
-        passwordHasheada,
-        Buffer.from(rut), // Ojo: Esto sigue sin ser AES-256
-        num_documento ? Buffer.from(num_documento) : null 
-    ]
-);
+        await pool.query(
+            `INSERT INTO usuarios (
+                nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
+            ) VALUES ($1, $2, $3, $4::bytea, $5::bytea, 1)`, // ✅ El ::bytea le quita la confusión a Postgres
+            [
+                nombre,
+                email,
+                passwordHasheada,
+                Buffer.from(rut),
+                num_documento ? Buffer.from(num_documento) : null // ✅ Si no viene, se guarda como NULL en vez de romper
+            ]
+        );
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
     } catch (err) {
         console.error('❌ Error en /api/registro:', err.message);
-        res.status(500).json({ error: err.message }); // ✅ Muestra el error real
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -150,7 +147,7 @@ app.post('/api/eventos', async (req, res) => {
 // LEER EVENTOS
 app.get('/api/eventos', async (req, res) => {
     try {
-        const queryEventos = await pool.query('SELECT * FROM eventos');
+        const queryEventos = await pool.query('SELECT * FROM voluntariados'); 
         res.json(queryEventos.rows);
     } catch (err) {
         console.error('❌ Error en /api/eventos GET:', err.message);
