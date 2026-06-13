@@ -103,9 +103,9 @@ app.post('/api/upgrade', async (req, res) => {
     try {
         // 🚀 Asegúrate de que este Query apunte a los nombres de columna reales de tu tabla de PostgreSQL
         const resultado = await pool.query(
+            const resultado = await pool.query(
             `UPDATE usuarios 
-             SET tipo_usuario = 2,           -- 🪪 Cambia a Organizador
-                 verificacion = true,          --  Fuerza el estado de verificación
+             SET tipo_usuario = 2, 
                  num_documento_encriptado = convert_to($1, 'UTF8') 
              WHERE usuario_id = $2 
              RETURNING *`,
