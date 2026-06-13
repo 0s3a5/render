@@ -169,7 +169,7 @@ app.get('/api/eventos', async (req, res) => {
                 e.creado_por,
                 u.nombre AS nombre_creador
             FROM voluntariados v 
-            INNER JOIN usuarios u ON e.creado_por = u.usuario_id
+            INNER JOIN usuarios u ON v.creado_por = u.usuario_id
         `);
         
         res.json(queryEventos.rows); 
