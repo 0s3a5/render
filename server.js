@@ -179,3 +179,6 @@ app.get('/api/eventos', async (req, res) => {
         res.status(500).json({ error: "Error al leer puntos desde Neon Tech" });
     }
 });
+app.listen(PORT, () => {
+    console.log(`📡 Backend corriendo y escuchando en el puerto ${PORT}`);
+});
