@@ -137,7 +137,7 @@ app.post('/api/eventos', async (req, res) => {
     try {
         // Insertamos en Neon Tech omitiendo el ID para que la base de datos use su propio autoincrementable
         const nuevoEvento = await pool.query(
-            `INSERT INTO eventos (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por) 
+            `INSERT INTO voluntariados (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por]
         );
@@ -169,7 +169,7 @@ app.get('/api/eventos', async (req, res) => {
                 e.fecha_evento,
                 e.creado_por,
                 u.nombre AS nombre_creador
-            FROM eventos e
+            FROM voluntariados e
             INNER JOIN usuarios u ON e.creado_por = u.usuario_id
         `);
         
