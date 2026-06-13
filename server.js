@@ -150,7 +150,7 @@ app.post('/api/eventos', async (req, res) => {
 // LEER EVENTOS
 app.get('/api/eventos', async (req, res) => {
     try {
-        const queryEventos = await pool.query('SELECT * FROM voluntariados');
+        const queryEventos = await pool.query('SELECT * FROM eventos');
         res.json(queryEventos.rows);
     } catch (err) {
         console.error('❌ Error en /api/eventos GET:', err.message);
