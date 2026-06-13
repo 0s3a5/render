@@ -156,10 +156,9 @@ app.post('/api/eventos', async (req, res) => {
 // LEER EVENTOS
 app.get('/api/eventos', async (req, res) => {
     try {
-        // Hacemos un INNER JOIN para enlazar el 'creado_por' del evento con el 'nombre' del usuario
         const queryEventos = await pool.query(`
             SELECT 
-                e.evento_id,
+                e.punto_id,  
                 e.titulo,
                 e.descripcion,
                 e.tipo_evento,
@@ -169,7 +168,7 @@ app.get('/api/eventos', async (req, res) => {
                 e.fecha_evento,
                 e.creado_por,
                 u.nombre AS nombre_creador
-            FROM voluntariados e
+            FROM eventos e /* O 'voluntariados v' si cambiaste el nombre de la tabla */
             INNER JOIN usuarios u ON e.creado_por = u.usuario_id
         `);
         
