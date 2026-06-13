@@ -158,15 +158,15 @@ app.get('/api/eventos', async (req, res) => {
     try {
         const queryEventos = await pool.query(`
             SELECT 
-                e.punto_id,  
-                e.titulo,
-                e.descripcion,
-                e.tipo_evento,
-                e.direccion,
-                e.latitud,
-                e.longitud,
-                e.fecha_evento,
-                e.creado_por,
+                v.punto_id,  
+                v.titulo,
+                v.descripcion,
+                v.tipo_evento,
+                v.direccion,
+                v.latitud,
+                v.longitud,
+                v.fecha_evento,
+                v.creado_por,
                 u.nombre AS nombre_creador
             FROM voluntariados v 
             INNER JOIN usuarios u ON v.creado_por = u.usuario_id
