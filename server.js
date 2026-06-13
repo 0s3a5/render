@@ -147,11 +147,11 @@ app.post('/api/eventos', async (req, res) => {
 // LEER EVENTOS
 app.get('/api/eventos', async (req, res) => {
     try {
-        const queryEventos = await pool.query('SELECT * FROM voluntariados'); 
-        res.json(queryEventos.rows);
+        const queryEventos = await pool.query('SELECT * FROM eventos');
+        res.json(queryEventos.rows); // Envía la lista de pines a la aplicación
     } catch (err) {
-        console.error('❌ Error en /api/eventos GET:', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('❌ Error en /api/eventos (GET):', err.message);
+        res.status(500).json({ error: "Error al leer puntos desde Neon Tech" });
     }
 });
 
