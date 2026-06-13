@@ -100,10 +100,13 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/upgrade', async (req, res) => {
     const { id, num_documento } = req.body;
 
+    if (!id || !num_documento) {
+        return res.status(400).json({ message: "Datos insuficientes para el ascenso." });
+    }
+
     try {
-        // 🚀 Asegúrate de que este Query apunte a los nombres de columna reales de tu tabla de PostgreSQL
+        // Realiza el UPDATE asegurándote de no usar la palabra 'verificacion'
         const resultado = await pool.query(
-            const resultado = await pool.query(
             `UPDATE usuarios 
              SET tipo_usuario = 2, 
                  num_documento_encriptado = convert_to($1, 'UTF8') 
@@ -113,13 +116,13 @@ app.post('/api/upgrade', async (req, res) => {
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
+            return res.status(404).json({ message: "El usuario no existe." });
         }
 
-        res.json({ message: "¡Validación aprobada con éxito!" });
+        res.json({ message: "¡Validación aprobada! Ahora eres Organizador Verificado." });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error en el servidor" });
+        console.error('❌ Error en /api/upgrade:', err.message);
+        res.status(500).json({ error: "Error de servidor al validar el documento." });
     }
 });
 // CASO 3: CREAR EVENTO
