@@ -40,13 +40,13 @@ app.post('/api/registro', async (req, res) => {
         await pool.query(
             `INSERT INTO usuarios (
                 nombre, email, password_hash, rut_encriptado, num_documento_encriptado, tipo_usuario
-            ) VALUES ($1, $2, $3, $4::bytea, $5::bytea, 1)`, // ✅ El ::bytea le quita la confusión a Postgres
+            ) VALUES ($1, $2, $3, $4::bytea, $5::bytea, 1)`,
             [
                 nombre,
                 email,
                 passwordHasheada,
                 Buffer.from(rut),
-                num_documento ? Buffer.from(num_documento) : null // ✅ Si no viene, se guarda como NULL en vez de romper
+                num_documento ? Buffer.from(num_documento) : null 
             ]
         );
         res.json({ message: "¡Cuenta creada con éxito! Registrado como Voluntario." });
@@ -105,7 +105,6 @@ app.post('/api/upgrade', async (req, res) => {
     }
 
     try {
-        // Realiza el UPDATE asegurándote de no usar la palabra 'verificacion'
         const resultado = await pool.query(
             `UPDATE usuarios 
              SET tipo_usuario = 2, 
@@ -125,18 +124,16 @@ app.post('/api/upgrade', async (req, res) => {
         res.status(500).json({ error: "Error de servidor al validar el documento." });
     }
 });
+
 // CASO 3: CREAR EVENTO
 app.post('/api/eventos', async (req, res) => {
-    // Desestructuramos lo que envía Android (los nombres gracias al @SerializedName de arriba)
     const { titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por } = req.body;
 
-    // Validación básica en el servidor
     if (!titulo || !descripcion || !tipo_evento || !direccion || !latitud || !longitud || !fecha_evento || !creado_por) {
         return res.status(400).json({ message: "Faltan campos obligatorios para crear el evento." });
     }
 
     try {
-        // Insertamos en Neon Tech omitiendo el ID para que la base de datos use su propio autoincrementable
         const nuevoEvento = await pool.query(
             `INSERT INTO voluntariados (titulo, descripcion, tipo_evento, direccion, latitud, longitud, fecha_evento, creado_por) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -154,7 +151,7 @@ app.post('/api/eventos', async (req, res) => {
     }
 });
 
-// LEER EVENTOS
+// LEER EVENTOS (Se añadió la columna v.reportes)
 app.get('/api/eventos', async (req, res) => {
     try {
         const queryEventos = await pool.query(`
@@ -168,10 +165,11 @@ app.get('/api/eventos', async (req, res) => {
                 v.longitud,
                 v.fecha_evento,
                 v.creado_por,
+                v.reportes, 
                 u.nombre AS nombre_creador
             FROM voluntariados v 
             INNER JOIN usuarios u ON v.creado_por = u.usuario_id
-        `);
+        `); // 🚀 v.reportes añadido aquí arriba
         
         res.json(queryEventos.rows); 
     } catch (err) {
@@ -179,6 +177,37 @@ app.get('/api/eventos', async (req, res) => {
         res.status(500).json({ error: "Error al leer puntos desde Neon Tech" });
     }
 });
+
+// 🚩 NUEVO: RUTA PARA REPORTAR UN EVENTO FALSO
+app.put('/api/eventos/reportar/:id', async (req, res) => {
+    const eventoId = req.params.id; // Recibimos el id del evento por la URL
+
+    try {
+        // Actualizamos de forma atómica: Si es nulo lo tratamos como 0, y sumamos 1.
+        const resultado = await pool.query(
+            `UPDATE voluntariados 
+             SET reportes = COALESCE(reportes, 0) + 1 
+             WHERE punto_id = $1 
+             RETURNING reportes`,
+            [eventoId]
+        );
+
+        // Si la base de datos no encontró el evento para actualizar
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ message: "Evento no encontrado en la base de datos." });
+        }
+
+        // Respondemos con éxito a la app de Android
+        res.json({ 
+            message: "Reporte sumado con éxito",
+            reportes_actuales: resultado.rows[0].reportes
+        });
+    } catch (err) {
+        console.error('❌ Error en /api/eventos/reportar:', err.message);
+        res.status(500).json({ error: "Error de servidor al intentar reportar el evento." });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`📡 Backend corriendo y escuchando en el puerto ${PORT}`);
 });
