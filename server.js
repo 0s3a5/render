@@ -207,7 +207,56 @@ app.put('/api/eventos/reportar/:id', async (req, res) => {
         res.status(500).json({ error: "Error de servidor al intentar reportar el evento." });
     }
 });
+// 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
+app.post('/api/inscripciones', async (req, res) => {
+    const { usuario_id, voluntario_id } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO inscripciones_voluntariados (usuario_id, voluntario_id) VALUES ($1, $2)`,
+            [usuario_id, voluntario_id]
+        );
+        res.json({ message: "¡Te has inscrito exitosamente!" });
+    } catch (err) {
+        // El código 23505 es el error de UNIQUE constraint (ya está inscrito)
+        if (err.code === '23505') {
+            return res.status(400).json({ error: "Ya estás inscrito en este voluntariado." });
+        }
+        console.error('❌ Error al inscribir:', err.message);
+        res.status(500).json({ error: "Error en el servidor al procesar la inscripción." });
+    }
+});
 
+// 🟢 2. RUTA: MIS VOLUNTARIADOS (Basado en tu documento)
+app.post('/api/mis-voluntariados', async (req, res) => {
+    const { usuario_id } = req.body;
+    try {
+        // Llama a la función que creaste en Neon Tech, tal como sale en tu documento
+        const query = await pool.query('SELECT obtener_mis_voluntariados_json($1) AS data', [usuario_id]);
+        
+        // Retorna el JSON. Si viene vacío, retorna un arreglo vacío
+        res.json(query.rows[0].data || []);
+    } catch (err) {
+        console.error('❌ Error al cargar mis voluntariados:', err.message);
+        res.status(500).json({ error: "Error del servidor" });
+    }
+});
+
+// 🟢 3. RUTA: VER INSCRITOS (Para el Creador)
+app.get('/api/eventos/:id/inscritos', async (req, res) => {
+    const eventoId = req.params.id;
+    try {
+        const query = await pool.query(`
+            SELECT u.nombre, convert_from(u.rut_encriptado, 'UTF8') AS rut
+            FROM inscripciones_voluntariados i
+            INNER JOIN usuarios u ON i.usuario_id = u.usuario_id
+            WHERE i.voluntario_id = $1
+        `, [eventoId]);
+        res.json(query.rows);
+    } catch (err) {
+        console.error('❌ Error al cargar inscritos:', err.message);
+        res.status(500).json({ error: "Error del servidor" });
+    }
+});
 app.listen(PORT, () => {
     console.log(`📡 Backend corriendo y escuchando en el puerto ${PORT}`);
 });
