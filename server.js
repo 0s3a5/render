@@ -230,7 +230,7 @@ app.post('/api/inscripciones', async (req, res) => {
 app.post('/api/mis-voluntariados', async (req, res) => {
     const { usuario_id } = req.body;
     try {
-        // Llama a la función que creaste en Neon Tech, tal como sale en tu documento
+        // Llama a la función que creaste en Neon Tech
         const query = await pool.query('SELECT obtener_mis_voluntariados_json($1) AS data', [usuario_id]);
         
         // Retorna el JSON. Si viene vacío, retorna un arreglo vacío
