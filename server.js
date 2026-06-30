@@ -277,13 +277,13 @@ app.post('/api/voluntariado-inscritos', async (req, res) => {
     const { voluntariado_id } = req.body;
     
     try {
-        // Cruzamos la tabla de inscripciones con la tabla de usuarios
+       // Cruzamos la tabla de inscripciones con la tabla de usuarios
         const query = await pool.query(`
             SELECT 
                 u.usuario_id AS id, 
-                u.usuario, 
+                u.usuario
             FROM inscripciones_voluntariados i
-            INNER JOIN usuarios u ON i.usuario_id = u.id
+            INNER JOIN usuarios u ON i.usuario_id = u.usuario_id
             WHERE i.voluntario_id = $1
         `, [voluntariado_id]);
         
