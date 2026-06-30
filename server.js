@@ -271,16 +271,27 @@ app.post('/api/mis-voluntariados', async (req, res) => {
 });
 
 // 🟢 3. RUTA: VER INSCRITOS (Para el Creador)
-app.get('/api/eventos/:id/inscritos', async (req, res) => {
-    const eventoId = req.params.id;
+// 🟢 3. RUTA: VER INSCRITOS DE UN VOLUNTARIADO
+app.post('/api/voluntariado-inscritos', async (req, res) => {
+    // Recibimos el ID del evento que queremos consultar
+    const { voluntariado_id } = req.body;
+    
     try {
+        // Cruzamos la tabla de inscripciones con la tabla de usuarios
         const query = await pool.query(`
-            SELECT u.nombre, convert_from(u.rut_encriptado, 'UTF8') AS rut
+            SELECT 
+                u.id, 
+                u.nombre, 
+                u.correo, 
+                u.telefono 
             FROM inscripciones_voluntariados i
-            INNER JOIN usuarios u ON i.usuario_id = u.usuario_id
+            INNER JOIN usuarios u ON i.usuario_id = u.id
             WHERE i.voluntario_id = $1
-        `, [eventoId]);
+        `, [voluntariado_id]);
+        
+        // Devolvemos la lista de personas al celular
         res.json(query.rows);
+        
     } catch (err) {
         console.error('❌ Error al cargar inscritos:', err.message);
         res.status(500).json({ error: "Error del servidor" });
