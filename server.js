@@ -281,7 +281,9 @@ app.post('/api/voluntariado-inscritos', async (req, res) => {
         const query = await pool.query(`
             SELECT 
                 u.usuario_id AS id, 
-                u.usuario
+                u.nombre,
+                u.email AS correo  /* 👈 Le decimos 'AS correo' para que Android no se confunda */
+                /* No pedimos u.telefono porque no existe en tu base de datos */
             FROM inscripciones_voluntariados i
             INNER JOIN usuarios u ON i.usuario_id = u.usuario_id
             WHERE i.voluntario_id = $1
