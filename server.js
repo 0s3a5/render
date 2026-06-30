@@ -225,10 +225,9 @@ app.post('/api/inscripciones', async (req, res) => {
        const infoResult = await pool.query(
             `SELECT u.email, v.titulo 
              FROM usuarios u, voluntariados v 
-             WHERE u.usuario_id = $1 AND v.id = $2`, // 👈 Aquí cambiamos u.id por u.usuario_id
+             WHERE u.usuario_id = $1 AND v.voluntario_id = $2`, // 👈 Aquí cambiamos v.id por v.voluntario_id
             [usuario_id, voluntario_id]
         );
-
         // Si encontramos los datos, disparamos el envío del correo en segundo plano
         if (infoResult.rows.length > 0) {
             const { email, titulo } = infoResult.rows[0];
