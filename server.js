@@ -208,14 +208,61 @@ app.put('/api/eventos/reportar/:id', async (req, res) => {
     }
 });
 // 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
+
 app.post('/api/inscripciones', async (req, res) => {
     const { usuario_id, voluntario_id } = req.body;
+    
     try {
+        // 1. Guardamos la inscripción de forma normal en la base de datos
         await pool.query(
             `INSERT INTO inscripciones_voluntariados (usuario_id, voluntario_id) VALUES ($1, $2)`,
             [usuario_id, voluntario_id]
         );
-        res.json({ message: "¡Te has inscrito exitosamente!" });
+
+        // 📥 2. NUEVO: Rescatamos el correo del usuario y el título del evento usando sus IDs
+        // ⚠️ NOTA: Asegúrate de que tus tablas y columnas se llamen así (ej: tabla 'usuarios' con columna 'email', 
+        // y tu tabla de eventos, que según tu código se llama 'voluntariados' o similar, con columna 'titulo').
+        const infoResult = await pool.query(
+            `SELECT u.email, v.titulo 
+             FROM usuarios u, voluntariados v 
+             WHERE u.id = $1 AND v.id = $2`,
+            [usuario_id, voluntario_id]
+        );
+
+        // Si encontramos los datos, disparamos el envío del correo en segundo plano
+        if (infoResult.rows.length > 0) {
+            const { email, titulo } = infoResult.rows[0];
+
+            // 📧 3. Configuración del correo electrónico personalizado
+            const mailOptions = {
+                from: '"Plataforma Voluntariado 🤝" <TU_CORREO_DE_PROYECTO@gmail.com>', // 👈 Pon tu correo de Gmail del proyecto
+                to: email, // El correo que acabamos de sacar de la Base de Datos
+                subject: `¡Inscripción Confirmada: ${titulo}!`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px; max-width: 500px;">
+                        <h2 style="color: #2F80ED; margin-top: 0;">¡Hola! Gracias por querer ayudar.</h2>
+                        <p>Te confirmamos que te has inscrito exitosamente al siguiente voluntariado:</p>
+                        <hr style="border: none; border-top: 1px solid #eee;">
+                        <p style="font-size: 16px;">📌 <strong>Evento:</strong> <span style="color: #333;">${titulo}</span></p>
+                        <hr style="border: none; border-top: 1px solid #eee;">
+                        <p style="color: #555; font-size: 14px;">¡Tu participación e iniciativa hacen la diferencia! Nos vemos allá.</p>
+                    </div>
+                `
+            };
+
+            // 🚀 4. Enviamos el correo electrónico por debajo
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error('❌ Error al enviar el correo de inscripción:', error.message);
+                } else {
+                    console.log('📧 Correo de confirmación enviado con éxito a:', email);
+                }
+            });
+        }
+
+        // 5. Respondemos exitosamente a la aplicación Android
+        res.json({ message: "¡Te has inscrito exitosamente! Te enviamos un correo con los detalles." });
+
     } catch (err) {
         // El código 23505 es el error de UNIQUE constraint (ya está inscrito)
         if (err.code === '23505') {
@@ -295,6 +342,16 @@ app.post('/api/voluntariado-inscritos', async (req, res) => {
     } catch (err) {
         console.error('❌ Error al cargar inscritos:', err.message);
         res.status(500).json({ error: "Error del servidor" });
+    }
+});
+const nodemailer = require('nodemailer');
+
+// Configuramos el correo que enviará los mensajes
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'latitudvoluntaria@gmail.com', // 👈 Cambia esto
+        pass: 'aupqxolqndmeqemo'  // 👈 Cambia esto (sin espacios)
     }
 });
 app.listen(PORT, () => {
