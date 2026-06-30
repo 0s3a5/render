@@ -280,10 +280,8 @@ app.post('/api/voluntariado-inscritos', async (req, res) => {
         // Cruzamos la tabla de inscripciones con la tabla de usuarios
         const query = await pool.query(`
             SELECT 
-                u.id, 
-                u.nombre, 
-                u.correo, 
-                u.telefono 
+                u.usuario_id AS id, 
+                u.usuario, 
             FROM inscripciones_voluntariados i
             INNER JOIN usuarios u ON i.usuario_id = u.id
             WHERE i.voluntario_id = $1
