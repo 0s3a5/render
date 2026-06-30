@@ -222,10 +222,10 @@ app.post('/api/inscripciones', async (req, res) => {
         // 📥 2. NUEVO: Rescatamos el correo del usuario y el título del evento usando sus IDs
         // ⚠️ NOTA: Asegúrate de que tus tablas y columnas se llamen así (ej: tabla 'usuarios' con columna 'email', 
         // y tu tabla de eventos, que según tu código se llama 'voluntariados' o similar, con columna 'titulo').
-        const infoResult = await pool.query(
+       const infoResult = await pool.query(
             `SELECT u.email, v.titulo 
              FROM usuarios u, voluntariados v 
-             WHERE u.id = $1 AND v.id = $2`,
+             WHERE u.usuario_id = $1 AND v.id = $2`, // 👈 Aquí cambiamos u.id por u.usuario_id
             [usuario_id, voluntario_id]
         );
 
