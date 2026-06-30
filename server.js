@@ -227,14 +227,43 @@ app.post('/api/inscripciones', async (req, res) => {
 });
 
 // 🟢 2. RUTA: MIS VOLUNTARIADOS (Basado en tu documento)
+// 🟢 2. RUTA MEJORADA: MIS VOLUNTARIADOS (Sin usar funciones de Neon)
 app.post('/api/mis-voluntariados', async (req, res) => {
     const { usuario_id } = req.body;
     try {
-        // Llama a la función que creaste en Neon Tech
-        const query = await pool.query('SELECT obtener_mis_voluntariados_json($1) AS data', [usuario_id]);
+        // Hacemos el JOIN directamente en SQL puro (más seguro)
+        const query = await pool.query(`
+            SELECT 
+                v.punto_id AS inscripcion_id,
+                'Reciente' AS fecha_inscripcion,
+                v.punto_id AS id,
+                v.titulo,
+                v.descripcion,
+                v.tipo_evento,
+                v.direccion,
+                v.fecha_evento
+            FROM inscripciones_voluntariados i
+            INNER JOIN voluntariados v ON i.voluntario_id = v.punto_id
+            WHERE i.usuario_id = $1
+        `, [usuario_id]);
         
-        // Retorna el JSON. Si viene vacío, retorna un arreglo vacío
-        res.json(query.rows[0].data || []);
+        // Node.js se encarga de armar el "molde" que Android espera
+        const resultados = query.rows.map(row => ({
+            inscripcion_id: row.inscripcion_id,
+            fecha_inscripcion: row.fecha_inscripcion,
+            voluntariado: {
+                id: row.id,
+                titulo: row.titulo,
+                descripcion: row.descripcion,
+                tipo_evento: row.tipo_evento,
+                direccion: row.direccion,
+                fecha_evento: row.fecha_evento
+            }
+        }));
+
+        // Enviamos la lista perfecta a Android
+        res.json(resultados);
+        
     } catch (err) {
         console.error('❌ Error al cargar mis voluntariados:', err.message);
         res.status(500).json({ error: "Error del servidor" });
