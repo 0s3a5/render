@@ -360,15 +360,17 @@ app.delete('/api/eventos/:id', async (req, res) => {
         // Si se llama distinto, cámbialo en la consulta SQL de abajo.
         
         
-await pool.query('DELETE FROM inscripciones WHERE voluntario_id = $1', [id]);
-// Luego borramos el evento
-await pool.query('DELETE FROM voluntariados WHERE id = $1', [id]);
-        
+const result = await pool.query(
+            "UPDATE voluntariados SET estado = 'finalizado' WHERE id = $1", 
+            [id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'El evento no existe' });
+        }
 
         // Verificamos si realmente se borró algo
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'El evento no existe o ya fue borrado' });
-        }
+      
 
         res.status(200).json({ message: 'Evento borrado de la base de datos exitosamente' });
 
