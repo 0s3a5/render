@@ -359,8 +359,7 @@ app.delete('/api/eventos/:id', async (req, res) => {
         // ⚠️ REVISA ESTO: Asegúrate de que tu columna principal se llame "id" o "voluntario_id"
         // Si se llama distinto, cámbialo en la consulta SQL de abajo.
         
-        const result = await pool.query(
-            // Primero borramos a los inscritos
+        
 await pool.query('DELETE FROM inscripciones WHERE voluntario_id = $1', [id]);
 // Luego borramos el evento
 await pool.query('DELETE FROM voluntariados WHERE id = $1', [id]);
