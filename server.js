@@ -382,6 +382,23 @@ const result = await pool.query(
         res.status(500).json({ error: 'Error interno del servidor al intentar borrar' });
     }
 });
+
+app.get('/api/mis-eventos/:usuario_id', async (req, res) => {
+    const { usuario_id } = req.params;
+    try {
+        const query = await pool.query(
+            `SELECT punto_id, titulo, tipo_evento, estado, fecha_evento 
+             FROM voluntariados 
+             WHERE creado_por = $1 
+             ORDER BY fecha_evento DESC`, 
+            [usuario_id]
+        );
+        res.json(query.rows);
+    } catch (error) {
+        console.error('❌ Error al obtener mis eventos:', error.message);
+        res.status(500).json({ error: 'Error al cargar el historial' });
+    }
+});
 app.listen(PORT, () => {
     console.log(`📡 Backend corriendo y escuchando en el puerto ${PORT}`);
 });
