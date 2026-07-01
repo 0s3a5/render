@@ -249,13 +249,13 @@ app.post('/api/inscripciones', async (req, res) => {
             };
 
             // 🚀 4. Enviamos el correo electrónico por debajo
-            transporter.sendMail(mailOptions, (error, info) => {
-                if (error) {
-                    console.error('❌ Error al enviar el correo de inscripción:', error.message);
-                } else {
-                    console.log('📧 Correo de confirmación enviado con éxito a:', email);
-                }
-            });
+           res.status(200).json({ message: 'Inscripción exitosa' });
+
+// 2. DESPUÉS, intentamos enviar el correo SIN el "await". 
+// Así el servidor lo hace en segundo plano sin hacer esperar a Android.
+transporter.sendMail(mailOptions).catch(error => {
+    console.error('❌ Error enviando correo en segundo plano:', error.message);
+});
         }
 
         // 5. Respondemos exitosamente a la aplicación Android
