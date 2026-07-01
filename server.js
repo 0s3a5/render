@@ -364,7 +364,7 @@ app.delete('/api/eventos/:id', async (req, res) => {
         
         
 const result = await pool.query(
-            "UPDATE voluntariados SET estado = 'finalizado' WHERE id = $1", 
+            "UPDATE voluntariados SET estado = 'finalizado' WHERE punto_id = $1", 
             [id]
         );
 
