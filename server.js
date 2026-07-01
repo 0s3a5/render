@@ -253,9 +253,15 @@ app.post('/api/inscripciones', async (req, res) => {
 
 // 2. DESPUÉS, intentamos enviar el correo SIN el "await". 
 // Así el servidor lo hace en segundo plano sin hacer esperar a Android.
-transporter.sendMail(mailOptions).catch(error => {
-    console.error('❌ Error enviando correo en segundo plano:', error.message);
-});
+transporter.sendMail(mailOptions)
+    .then((info) => {
+        // ✅ Bien: Solo imprimimos en la consola del servidor
+        console.log('Correo enviado correctamente en segundo plano'); 
+    })
+    .catch((error) => {
+        // ✅ Bien: Solo imprimimos el error en la consola
+        console.error('Error enviando el correo:', error);
+    });
         }
 
         // 5. Respondemos exitosamente a la aplicación Android
