@@ -210,6 +210,7 @@ app.put('/api/eventos/reportar/:id', async (req, res) => {
 });
 // 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
 
+// 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
 app.post('/api/inscripciones', async (req, res) => {
     const { usuario_id, voluntario_id } = req.body;
     
@@ -220,21 +221,22 @@ app.post('/api/inscripciones', async (req, res) => {
             [usuario_id, voluntario_id]
         );
 
-        // 📥 2. NUEVO: Rescatamos el correo del usuario y el título del evento usando sus IDs
-        // ⚠️ NOTA: Asegúrate de que tus tablas y columnas se llamen así (ej: tabla 'usuarios' con columna 'email', 
-        // y tu tabla de eventos, que según tu código se llama 'voluntariados' o similar, con columna 'titulo').
-       const infoResult = await pool.query(
-    `SELECT email FROM usuarios WHERE usuario_id = $1`,
-    [usuario_id]
-);
-        // Si encontramos los datos, disparamos el envío del correo en segundo plano
+        // 📥 2. ARREGLADO: Rescatamos el correo del usuario Y el título del evento al mismo tiempo
+        const infoResult = await pool.query(
+            `SELECT u.email, v.titulo 
+             FROM usuarios u, voluntariados v 
+             WHERE u.usuario_id = $1 AND v.punto_id = $2`,
+            [usuario_id, voluntario_id]
+        );
+
+        // Si encontramos los datos, preparamos el envío del correo en segundo plano
         if (infoResult.rows.length > 0) {
             const { email, titulo } = infoResult.rows[0];
 
-            // 📧 3. Configuración del correo electrónico personalizado
+            // 📧 3. Configuración del correo electrónico
             const mailOptions = {
-                from: '"Plataforma Voluntariado 🤝" <TU_CORREO_DE_PROYECTO@gmail.com>', // 👈 Pon tu correo de Gmail del proyecto
-                to: email, // El correo que acabamos de sacar de la Base de Datos
+                from: '"Plataforma Voluntariado 🤝" <latitudvoluntaria@gmail.com>', 
+                to: email, 
                 subject: `¡Inscripción Confirmada: ${titulo}!`,
                 html: `
                     <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px; max-width: 500px;">
@@ -248,32 +250,31 @@ app.post('/api/inscripciones', async (req, res) => {
                 `
             };
 
-            // 🚀 4. Enviamos el correo electrónico por debajo
-           res.status(200).json({ message: 'Inscripción exitosa' });
-
-// 2. DESPUÉS, intentamos enviar el correo SIN el "await". 
-// Así el servidor lo hace en segundo plano sin hacer esperar a Android.
-transporter.sendMail(mailOptions)
-    .then((info) => {
-        // ✅ Bien: Solo imprimimos en la consola del servidor
-        console.log('Correo enviado correctamente en segundo plano'); 
-    })
-    .catch((error) => {
-        // ✅ Bien: Solo imprimimos el error en la consola
-        console.error('Error enviando el correo:', error);
-    });
+            // 🚀 4. Enviamos el correo electrónico por debajo (sin await y SIN res.json aquí)
+            transporter.sendMail(mailOptions)
+                .then(() => {
+                    console.log(`✅ Correo enviado correctamente a: ${email}`); 
+                })
+                .catch((error) => {
+                    console.error('❌ Error enviando el correo:', error);
+                });
         }
 
-        // 5. Respondemos exitosamente a la aplicación Android
-        res.json({ message: "¡Te has inscrito exitosamente! Te enviamos un correo con los detalles." });
+        // 5. ¡LA ÚNICA RESPUESTA! El servidor responde al celular una sola vez.
+        return res.status(200).json({ message: "¡Te has inscrito exitosamente! Te enviamos un correo con los detalles." });
 
     } catch (err) {
         // El código 23505 es el error de UNIQUE constraint (ya está inscrito)
         if (err.code === '23505') {
             return res.status(400).json({ error: "Ya estás inscrito en este voluntariado." });
         }
+        
         console.error('❌ Error al inscribir:', err.message);
-        res.status(500).json({ error: "Error en el servidor al procesar la inscripción." });
+        
+        // 🛡️ ESCUDO: Solo responde error 500 si no hemos respondido antes
+        if (!res.headersSent) {
+            return res.status(500).json({ error: "Error en el servidor al procesar la inscripción." });
+        }
     }
 });
 
