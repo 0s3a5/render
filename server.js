@@ -223,11 +223,9 @@ app.post('/api/inscripciones', async (req, res) => {
         // ⚠️ NOTA: Asegúrate de que tus tablas y columnas se llamen así (ej: tabla 'usuarios' con columna 'email', 
         // y tu tabla de eventos, que según tu código se llama 'voluntariados' o similar, con columna 'titulo').
        const infoResult = await pool.query(
-            `SELECT u.email, v.titulo 
-             FROM usuarios u, voluntariados v 
-             WHERE u.usuario_id = $1 AND v.voluntario_id = $2`, // 👈 Aquí cambiamos v.id por v.voluntario_id
-            [usuario_id, voluntario_id]
-        );
+    `SELECT email FROM usuarios WHERE usuario_id = $1`,
+    [usuario_id]
+);
         // Si encontramos los datos, disparamos el envío del correo en segundo plano
         if (infoResult.rows.length > 0) {
             const { email, titulo } = infoResult.rows[0];
