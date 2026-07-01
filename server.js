@@ -167,7 +167,7 @@ app.get('/api/eventos', async (req, res) => {
                 v.creado_por,
                 v.reportes, 
                 u.nombre AS nombre_creador
-            FROM voluntariados v WHERE estado = 'activo'
+            FROM voluntariados v
             INNER JOIN usuarios u ON v.creado_por = u.usuario_id
             WHERE v.estado = 'activo'
         `); // 🚀 v.reportes añadido aquí arriba
