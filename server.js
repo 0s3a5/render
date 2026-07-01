@@ -208,7 +208,7 @@ app.put('/api/eventos/reportar/:id', async (req, res) => {
         res.status(500).json({ error: "Error de servidor al intentar reportar el evento." });
     }
 });
-// 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO (ACTUALIZADA CON RESEND)
+// 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO (INCLUYE FECHA Y LUGAR EN EL CORREO)
 app.post('/api/inscripciones', async (req, res) => {
     const { usuario_id, voluntario_id } = req.body;
     
@@ -219,35 +219,51 @@ app.post('/api/inscripciones', async (req, res) => {
             [usuario_id, voluntario_id]
         );
 
-        // 📥 2. Rescatamos el correo del usuario y el título del evento
+        // 📥 2. NUEVO: Rescatamos el email del usuario, y el título, dirección y fecha del evento
         const infoResult = await pool.query(
-            `SELECT u.email, v.titulo 
+            `SELECT u.email, v.titulo, v.direccion, v.fecha_evento 
              FROM usuarios u, voluntariados v 
              WHERE u.usuario_id = $1 AND v.punto_id = $2`,
             [usuario_id, voluntario_id]
         );
 
         if (infoResult.rows.length > 0) {
-            const { email, titulo } = infoResult.rows[0];
+            // Extraemos las nuevas variables: direccion y fecha_evento
+            const { email, titulo, direccion, fecha_evento } = infoResult.rows[0];
 
-            // 🚀 3. Enviamos el correo usando la API de Resend (No usa puertos bloqueados)
+            // Formateamos la fecha si viene como objeto Date para que se vea más limpia
+            const fechaFormateada = fecha_evento ? new Date(fecha_evento).toLocaleDateString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'Por confirmar';
+
+            // 🚀 3. Enviamos el correo usando la API de Resend
             resend.emails.send({
-                from: 'Plataforma Voluntariado <onboarding@resend.dev>', // 👈 Resend gratis te da este remitente por defecto
+                from: 'Plataforma Voluntariado <onboarding@resend.dev>', 
                 to: email, 
                 subject: `¡Inscripción Confirmada: ${titulo}!`,
                 html: `
                     <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px; max-width: 500px;">
                         <h2 style="color: #2F80ED; margin-top: 0;">¡Hola! Gracias por querer ayudar.</h2>
                         <p>Te confirmamos que te has inscrito exitosamente al siguiente voluntariado:</p>
+                        
                         <hr style="border: none; border-top: 1px solid #eee;">
-                        <p style="font-size: 16px;">📌 <strong>Evento:</strong> <span style="color: #333;">${titulo}</span></p>
+                        
+                        <p style="font-size: 15px; margin: 10px 0;">📌 <strong>Evento:</strong> <span style="color: #333;">${titulo}</span></p>
+                        <p style="font-size: 15px; margin: 10px 0;">📍 <strong>Lugar / Dirección:</strong> <span style="color: #333;">${direccion || 'No especificada'}</span></p>
+                        <p style="font-size: 15px; margin: 10px 0;">📅 <strong>Fecha y Hora:</strong> <span style="color: #333;">${fechaFormateada}</span></p>
+                        
                         <hr style="border: none; border-top: 1px solid #eee;">
+                        
                         <p style="color: #555; font-size: 14px;">¡Tu participación e iniciativa hacen la diferencia! Nos vemos allá.</p>
                     </div>
                 `
             })
             .then(() => {
-                console.log(`✅ Correo enviado con éxito vía API a: ${email}`);
+                console.log(`✅ Correo completo enviado con éxito a: ${email}`);
             })
             .catch((error) => {
                 console.error('❌ Error de la API de Resend:', error);
