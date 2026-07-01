@@ -209,19 +209,17 @@ app.put('/api/eventos/reportar/:id', async (req, res) => {
     }
 });
 // 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
-
-// 🟢 1. RUTA PARA INSCRIBIRSE A UN VOLUNTARIADO
 app.post('/api/inscripciones', async (req, res) => {
     const { usuario_id, voluntario_id } = req.body;
     
     try {
-        // 1. Guardamos la inscripción de forma normal en la base de datos
+        // 1. Guardamos la inscripción en la base de datos
         await pool.query(
             `INSERT INTO inscripciones_voluntariados (usuario_id, voluntario_id) VALUES ($1, $2)`,
             [usuario_id, voluntario_id]
         );
 
-        // 📥 2. ARREGLADO: Rescatamos el correo del usuario Y el título del evento al mismo tiempo
+        // 📥 2. Rescatamos el correo del usuario y el título del evento
         const infoResult = await pool.query(
             `SELECT u.email, v.titulo 
              FROM usuarios u, voluntariados v 
@@ -229,13 +227,12 @@ app.post('/api/inscripciones', async (req, res) => {
             [usuario_id, voluntario_id]
         );
 
-        // Si encontramos los datos, preparamos el envío del correo en segundo plano
         if (infoResult.rows.length > 0) {
             const { email, titulo } = infoResult.rows[0];
 
-            // 📧 3. Configuración del correo electrónico
-            const mailOptions = {
-                from: '"Plataforma Voluntariado 🤝" <latitudvoluntaria@gmail.com>', 
+            // 🚀 3. Enviamos el correo usando la API de Resend (No usa puertos bloqueados)
+            resend.emails.send({
+                from: 'Plataforma Voluntariado <onboarding@resend.dev>', // 👈 Resend gratis te da este remitente por defecto
                 to: email, 
                 subject: `¡Inscripción Confirmada: ${titulo}!`,
                 html: `
@@ -248,36 +245,28 @@ app.post('/api/inscripciones', async (req, res) => {
                         <p style="color: #555; font-size: 14px;">¡Tu participación e iniciativa hacen la diferencia! Nos vemos allá.</p>
                     </div>
                 `
-            };
-
-            // 🚀 4. Enviamos el correo electrónico por debajo (sin await y SIN res.json aquí)
-            transporter.sendMail(mailOptions)
-                .then(() => {
-                    console.log(`✅ Correo enviado correctamente a: ${email}`); 
-                })
-                .catch((error) => {
-                    console.error('❌ Error enviando el correo:', error);
-                });
+            })
+            .then(() => {
+                console.log(`✅ Correo enviado con éxito vía API a: ${email}`);
+            })
+            .catch((error) => {
+                console.error('❌ Error de la API de Resend:', error);
+            });
         }
 
-        // 5. ¡LA ÚNICA RESPUESTA! El servidor responde al celular una sola vez.
+        // 4. Respondemos al celular de inmediato
         return res.status(200).json({ message: "¡Te has inscrito exitosamente! Te enviamos un correo con los detalles." });
 
     } catch (err) {
-        // El código 23505 es el error de UNIQUE constraint (ya está inscrito)
         if (err.code === '23505') {
             return res.status(400).json({ error: "Ya estás inscrito en este voluntariado." });
         }
-        
         console.error('❌ Error al inscribir:', err.message);
-        
-        // 🛡️ ESCUDO: Solo responde error 500 si no hemos respondido antes
         if (!res.headersSent) {
             return res.status(500).json({ error: "Error en el servidor al procesar la inscripción." });
         }
     }
 });
-
 // 🟢 2. RUTA: MIS VOLUNTARIADOS (Basado en tu documento)
 // 🟢 2. RUTA MEJORADA: MIS VOLUNTARIADOS (Sin usar funciones de Neon)
 app.post('/api/mis-voluntariados', async (req, res) => {
@@ -349,18 +338,8 @@ app.post('/api/voluntariado-inscritos', async (req, res) => {
         res.status(500).json({ error: "Error del servidor" });
     }
 });
-const nodemailer = require('nodemailer');
-
-// Configuramos el correo que enviará los mensajes
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-        user: 'latitudvoluntaria@gmail.com', // 👈 Cambia esto
-        pass: 'aupqxolqndmeqemo'  // 👈 Cambia esto (sin espacios)
-    }
-});
+const { Resend } = require('resend');
+const resend = new Resend('re_SaYTgjn3_BXkhuvYa39g1se4yjLuv8itJ');
 // 🛑 Ruta para borrar un evento por completo
 app.delete('/api/eventos/:id', async (req, res) => {
     const { id } = req.params;
