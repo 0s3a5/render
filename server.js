@@ -394,10 +394,10 @@ app.get('/api/mis-eventos/:usuario_id', async (req, res) => {
     const { usuario_id } = req.params;
     try {
         const query = await pool.query(
-            `SELECT punto_id, titulo, tipo_evento, estado, fecha_evento 
+            `SELECT punto_id, titulo, tipo_evento, estado, fecha_evento, COALESCE(reportes, 0) AS reportes 
              FROM voluntariados 
              WHERE creado_por = $1 
-             ORDER BY fecha_evento DESC`, 
+             ORDER BY fecha_evento DESC`,
             [usuario_id]
         );
         res.json(query.rows);
