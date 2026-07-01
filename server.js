@@ -353,6 +353,33 @@ const transporter = nodemailer.createTransport({
         pass: 'aupqxolqndmeqemo'  // 👈 Cambia esto (sin espacios)
     }
 });
+// 🛑 Ruta para borrar un evento por completo
+app.delete('/api/eventos/:id', async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        // ⚠️ REVISA ESTO: Asegúrate de que tu columna principal se llame "id" o "voluntario_id"
+        // Si se llama distinto, cámbialo en la consulta SQL de abajo.
+        
+        const result = await pool.query(
+            // Primero borramos a los inscritos
+await pool.query('DELETE FROM inscripciones WHERE voluntario_id = $1', [id]);
+// Luego borramos el evento
+await pool.query('DELETE FROM voluntariados WHERE id = $1', [id]);
+        
+
+        // Verificamos si realmente se borró algo
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'El evento no existe o ya fue borrado' });
+        }
+
+        res.status(200).json({ message: 'Evento borrado de la base de datos exitosamente' });
+
+    } catch (error) {
+        console.error('❌ Error al borrar el evento:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor al intentar borrar' });
+    }
+});
 app.listen(PORT, () => {
     console.log(`📡 Backend corriendo y escuchando en el puerto ${PORT}`);
 });
