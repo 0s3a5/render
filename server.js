@@ -345,7 +345,9 @@ const nodemailer = require('nodemailer');
 
 // Configuramos el correo que enviará los mensajes
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
         user: 'latitudvoluntaria@gmail.com', // 👈 Cambia esto
         pass: 'aupqxolqndmeqemo'  // 👈 Cambia esto (sin espacios)
